@@ -1,0 +1,485 @@
+================================================================================
+PROJECT NYAYA — TECHNICAL DOCUMENTATION
+Voice-First AI Legal Triage for Marginalized Communities in India
+================================================================================
+
+Covers: RTI (Right to Information) | Domestic Violence (PWDVA) | Divorce (HMA)
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+ 1. Project Overview
+ 2. Architecture
+ 3. Tech Stack
+ 4. Project Structure
+ 5. Setup & Installation
+ 6. Environment Variables
+ 7. Backend API Reference
+ 8. Frontend Components
+ 9. Context Retrieval Pipeline
+10. Agentic Form Filling
+11. PDF Generation
+12. Legal Knowledge Base
+13. Deployment Notes
+14. Disclaimer
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+Project Nyaya is a web application that helps underprivileged Indian citizens
+understand their legal rights and take action. A user speaks or types their
+legal situation in any Indian language. The AI:
+
+  - Identifies the legal category (RTI / Domestic Violence / Divorce)
+  - Explains rights with specific act citations, fees, timelines, authorities
+  - Offers to fill the relevant government form
+  - Generates a ready-to-submit PDF draft
+
+KEY CAPABILITIES:
+  * Multilingual input   — browser-native Web Speech API, 11 Indian languages
+  * Legal analysis       — Groq Llama 3.3 70B + ChromaDB RAG, cites sections
+  * Live gov data        — fetches CIC, IndiaCode, NALSA, WCD portals
+  * Agentic form filling — extracts fields from voice, asks for missing info
+  * PDF generation       — RTI Application, DV Complaint, Divorce Petition
+
+================================================================================
+2. ARCHITECTURE
+================================================================================
+
+  Browser (Next.js)
+    |
+    |-- Text input OR webkitSpeechRecognition (browser-native, no backend)
+    |
+    POST /api/analyze
+    |
+    v
+  FastAPI Backend
+    |
+    |-- [1] Web Fetcher (httpx, 6s timeout)
+    |         Fetches from: CIC, IndiaCode, NALSA, WCD, Nyaaya
+    |
+    |-- [2] ChromaDB RAG fallback (ONNXMiniLM-L6-v2 embeddings)
+    |         Used if web fetch returns < 300 chars
+    |
+    |-- [3] Groq Llama 3.3 70B --> Structured JSON response
+    |
+    |-- /api/extract_form  (LLM field extraction from voice text)
+    |-- /api/generate_form_pdf  (fpdf2 PDF builder)
+    |
+    v
+  /static/<uuid>.pdf (served as static file)
+
+CONTEXT RETRIEVAL PRIORITY:
+  1. Live web fetch from government portals (primary, if >= 300 chars returned)
+  2. ChromaDB semantic search over legal chunks (fallback)
+  3. Both fused when web fetch succeeds
+
+================================================================================
+3. TECH STACK
+================================================================================
+
+BACKEND:
+  fastapi                 API framework
+  uvicorn                 ASGI server
+  groq                    Llama 3.3 70B inference
+  chromadb                Vector store for RAG
+  ONNXMiniLM-L6-v2        Embedding model (runs locally)
+  httpx                   Async HTTP for gov portal fetching
+  beautifulsoup4          HTML text extraction
+  fpdf2                   PDF generation
+  python-dotenv           Environment variable loading
+  pydantic                Request/response schema validation
+
+FRONTEND:
+  Next.js 14              React framework, App Router
+  TypeScript              Type safety
+  Tailwind CSS            Styling
+  Web Speech API          Browser-native speech recognition (no backend)
+  lucide-react            Icons
+
+================================================================================
+4. PROJECT STRUCTURE
+================================================================================
+
+project-nyaya/
+|
+|-- backend/
+|   |-- main.py                  FastAPI app: all routes, models, LLM logic
+|   |-- form_pdf_builder.py      PDF generation (RTI / DV / Divorce)
+|   |-- web_fetcher.py           Async gov portal scraper
+|   |-- test_web_fetch.py        Manual test script
+|   |-- requirements.txt         Python dependencies
+|   |-- .env                     Secrets (gitignored)
+|   |-- .env.example             Template for .env
+|   `-- static/                  Generated PDFs (gitignored)
+|
+|-- frontend/
+|   |-- src/
+|   |   |-- app/
+|   |   |   |-- page.tsx         Main page: text/mic toggle, result display
+|   |   |   |-- layout.tsx       Root layout, metadata
+|   |   |   `-- globals.css      Global styles
+|   |   |-- components/
+|   |   |   |-- MicButton.tsx    Web Speech API + language selector
+|   |   |   |-- FormCollector.tsx Agentic form UI (pre-fill + missing fields)
+|   |   |   |-- ResultCard.tsx   AI analysis display card
+|   |   |   |-- Timeline.tsx     Step-by-step legal process timeline
+|   |   |   `-- DownloadButton.tsx PDF download button
+|   |   `-- data/
+|   |       `-- timelines.js     RTI / DV / Divorce step data
+|   |-- .env.local               Frontend env vars (gitignored)
+|   `-- package.json
+|
+|-- .gitignore
+|-- README.md
+|-- DOCUMENTATION.md
+`-- DOCUMENTATION.txt            (this file)
+
+================================================================================
+5. SETUP & INSTALLATION
+================================================================================
+
+PREREQUISITES:
+  - Python 3.10+
+  - Node.js 18+
+  - Groq API key (free at https://console.groq.com)
+
+BACKEND:
+  cd backend
+  python -m venv .venv
+  .venv\Scripts\activate            (Windows)
+  source .venv/bin/activate          (macOS/Linux)
+  pip install -r requirements.txt
+  copy .env.example .env             (then add your GROQ_API_KEY)
+  uvicorn main:app --reload --port 8000
+
+  API available at:  http://localhost:8000
+  Interactive docs:  http://localhost:8000/docs
+
+FRONTEND:
+  cd frontend
+  npm install
+  (create frontend/.env.local with: NEXT_PUBLIC_BACKEND_URL=http://localhost:8000)
+  npm run dev
+
+  App available at:  http://localhost:3000
+
+================================================================================
+6. ENVIRONMENT VARIABLES
+================================================================================
+
+backend/.env:
+  GROQ_API_KEY      (required) Groq API key for Llama 3.3 70B
+  DEMO_MODE         (optional) Set true to run without API key (mock responses)
+
+frontend/.env.local:
+  NEXT_PUBLIC_BACKEND_URL  (required) Backend URL, e.g. http://localhost:8000
+
+================================================================================
+7. BACKEND API REFERENCE
+================================================================================
+
+Base URL: http://localhost:8000
+
+------------------------------------------------------------------------
+POST /api/analyze
+------------------------------------------------------------------------
+Analyses user text and returns structured legal guidance.
+
+Request:
+  { "text": "I want to file an RTI about my pension. My name is Ravi Kumar." }
+
+Response:
+  {
+    "intent_detected": "RTI | Domestic Violence | Divorce | Unknown",
+    "kill_switch_triggered": false,
+    "simplified_explanation": "Under Section 6(1) RTI Act 2005...",
+    "relevant_acts": ["Section 6(1), RTI Act 2005 — Filing procedure"],
+    "immediate_action_steps": ["Step 1...", "Step 2..."],
+    "extracted_user_issue": "User wants RTI about pension delay",
+    "follow_up_question": "Which department handles your pension?",
+    "context_source": "WEB+RAG | RAG",
+    "sources_used": ["https://cic.gov.in/..."]
+  }
+
+Kill switch: set to true when query is outside scope (income tax, property
+disputes, subjective opinions). No legal guidance returned.
+
+------------------------------------------------------------------------
+POST /api/extract_form
+------------------------------------------------------------------------
+Extracts structured form fields from the user's voice/text using LLM.
+
+Request:
+  {
+    "text": "My name is Priya Sharma, I live at 45 MG Road Chennai...",
+    "intent": "Domestic Violence"
+  }
+
+Response:
+  {
+    "intent": "Domestic Violence",
+    "form_data": {
+      "complainant_name": "Priya Sharma",
+      "complainant_address": "45 MG Road Chennai",
+      "respondent_name": "Ramesh",
+      "complainant_age": null,
+      "incident_date": null
+    },
+    "missing_fields": ["complainant_age", "incident_date"],
+    "missing_questions": ["What is your age?", "When did the incident occur?"]
+  }
+
+Extraction rule: Only extracts what user explicitly stated. Unmentioned
+fields are returned as null.
+
+------------------------------------------------------------------------
+POST /api/generate_form_pdf
+------------------------------------------------------------------------
+Generates a formatted legal document PDF from completed form data.
+
+Request:
+  {
+    "intent": "RTI | Domestic Violence | Divorce",
+    "form_data": { ... }
+  }
+
+Response:
+  {
+    "pdf_url": "/static/nyaya_form_<uuid>.pdf",
+    "pdf_filename": "nyaya_form_<uuid>.pdf",
+    "intent": "Domestic Violence"
+  }
+
+PDF served at: http://localhost:8000/static/<filename>
+
+------------------------------------------------------------------------
+POST /api/generate_pdf
+------------------------------------------------------------------------
+Generates a summary PDF of the AI legal analysis result (guidance document,
+not a form). Takes full IntentResult object. Returns { "pdf_url": "..." }
+
+------------------------------------------------------------------------
+POST /api/transcribe
+------------------------------------------------------------------------
+Transcribes uploaded audio using OpenAI Whisper.
+Requires OPENAI_API_KEY (not used in default flow — frontend uses Web
+Speech API instead). Available for future integration.
+
+Request: multipart/form-data, field "audio" (WebM/Opus file)
+Response: { "text": "Transcribed text" }
+
+------------------------------------------------------------------------
+POST /api/process
+------------------------------------------------------------------------
+Combined endpoint: transcribes audio -> analyses -> returns result.
+Request: multipart/form-data, field "audio".
+Response: same shape as /api/analyze.
+
+------------------------------------------------------------------------
+GET /api/debug/retrieve?query=<text>&intent=<intent>
+------------------------------------------------------------------------
+Returns top RAG chunks retrieved for a query (debug use).
+
+------------------------------------------------------------------------
+GET /api/debug/sources
+------------------------------------------------------------------------
+Returns list of configured government portal sources.
+
+================================================================================
+8. FRONTEND COMPONENTS
+================================================================================
+
+page.tsx (Main Page)
+  - Text/Mic toggle (switches between input modes)
+  - Text mode: textarea -> POST /api/analyze -> results
+  - Mic mode: webkitSpeechRecognition -> transcript -> POST /api/analyze
+  - Renders ResultCard, Timeline, FormCollector modal
+
+MicButton.tsx (Voice Input)
+  - Uses browser-native Web Speech API (webkitSpeechRecognition)
+  - 11 Indian languages selectable from dropdown
+  - Continuous mode: auto-restarts after Chrome's 5s silence auto-stop
+  - Shows live transcript: final words (dark) + interim words (grey italic)
+  - On stop: sends transcript to /api/analyze
+  - Falls back gracefully on Firefox/Safari (unsupported)
+
+FormCollector.tsx (Agentic Form UI)
+  - Shown after user clicks "Generate My Filled Document"
+  - On mount: calls /api/extract_form -> gets pre-filled + missing fields
+  - Green fields = pre-filled by AI from voice transcript
+  - Amber fields = missing: shows question + input for user to fill
+  - On "Generate": calls /api/generate_form_pdf -> shows download link
+
+ResultCard.tsx (Analysis Display)
+  - Intent badge (RTI / Domestic Violence / Divorce)
+  - Simplified legal explanation (with act citations)
+  - Relevant acts list, immediate action steps
+  - Your issue as understood by AI, follow-up question
+
+Timeline.tsx (Legal Process Steps)
+  - RTI:      Draft -> File -> Wait 30d -> First Appeal -> CIC
+  - DV:       Safety -> Protection Officer -> File -> Court order
+  - Divorce:  Both agree -> Family Court -> First Motion -> Cooling off -> Decree
+
+DownloadButton.tsx
+  - Download button linking to generated PDF URL
+
+================================================================================
+9. CONTEXT RETRIEVAL PIPELINE
+================================================================================
+
+Web Fetcher (web_fetcher.py):
+  Configured sources:
+    CIC Portal      cic.gov.in           RTI appeals, decisions
+    IndiaCode       indiacode.nic.in     RTI Act full text
+    NALSA           nalsa.gov.in         Legal aid entitlements
+    Ministry WCD    wcd.nic.in           PWDVA, domestic violence
+    Nyaaya          nyaaya.org           Plain-language law summaries
+
+  Timeout: 6 seconds per request
+  Fallback: if combined content < 300 chars, use ChromaDB RAG
+
+ChromaDB RAG:
+  Embedding model: ONNXMiniLM-L6-v2 (runs locally, no API key needed)
+  Storage: In-memory ChromaDB, populated at startup from LEGAL_CHUNKS
+  Retrieval: Top-5 semantically similar chunks
+  Topics: RTI Act 2005, PWDVA 2005, HMA 1955
+
+================================================================================
+10. AGENTIC FORM FILLING
+================================================================================
+
+FLOW:
+  1. User speaks/types their legal situation
+  2. /api/analyze detects intent (RTI / DV / Divorce)
+  3. User clicks "Generate My Filled Document"
+  4. FormCollector calls /api/extract_form
+       - Pre-filled fields (green):  AI extracted from voice text
+       - Missing fields (amber):     User must fill in; question provided
+  5. User completes missing fields
+  6. "Generate My Legal Document" -> /api/generate_form_pdf
+  7. Download ready-to-submit PDF draft
+
+RTI FORM FIELDS:
+  name, address, phone, email, bpl_status,
+  department_name, department_address, pio_name,
+  information_requested, time_period, format_required, fee_payment_mode
+
+DV COMPLAINT FIELDS:
+  complainant_name, complainant_age, complainant_address, complainant_phone,
+  respondent_name, respondent_relation, respondent_address,
+  nature_of_violence (array: Physical/Sexual/Verbal/Emotional/Economic/Dowry),
+  incident_date, incident_description, witnesses,
+  children (array of {name, age}),
+  relief_protection, relief_residence, relief_monetary_amount, relief_custody
+
+DIVORCE PETITION FIELDS:
+  petitioner1_name/age/occupation/address,
+  petitioner2_name/age/occupation/address,
+  marriage_date, marriage_place, marriage_registration_number,
+  separation_date, separation_address,
+  children (array), alimony_amount, alimony_terms,
+  custody_arrangement, stridhan_settled, property_settled
+
+================================================================================
+11. PDF GENERATION
+================================================================================
+
+Module: form_pdf_builder.py
+Library: fpdf2 (Helvetica, Latin-1 safe — no Unicode font required)
+
+Functions:
+  build_rti_pdf(data, path)      RTI Application, Section 6 RTI Act 2005
+  build_dv_pdf(data, path)       DV Complaint, Section 12 PWDVA 2005
+  build_divorce_pdf(data, path)  Mutual Consent Petition, Section 13B HMA 1955
+
+PDF STRUCTURE (each document):
+  1. Nyaya header bar (dark navy) with Nyaya branding
+  2. Document title block (blue) with legal act citation
+  3. Numbered sections with labelled fields:
+       - Filled text (green) = extracted from voice
+       - Blank underline = missing (fill before submission)
+  4. Procedure box ("How to File This Document")
+  5. Legal disclaimer box (amber — draft only)
+
+================================================================================
+12. LEGAL KNOWLEDGE BASE
+================================================================================
+
+RTI ACT 2005 (built-in RAG chunks):
+  - Scope and definitions (Section 2(f) — Information definition)
+  - Right to information and public authority obligations
+  - Section 6 — Filing procedure (application to PIO)
+  - Time limits: 30 days standard, 48 hours for life/liberty
+  - Fee: Rs. 10 general, BPL cardholders exempt
+  - Section 8 — Exemptions (national security, Cabinet papers, etc.)
+  - Appeals: First Appeal to FAA, Second Appeal to CIC
+  - Section 20 — Penalty: Rs. 250/day, max Rs. 25,000
+  - Online RTI: rtionline.gov.in
+
+PWDVA 2005 (Domestic Violence Act):
+  - Section 3 — Definition of domestic violence (physical/sexual/verbal/
+                 emotional/economic abuse)
+  - Aggrieved person: any woman in a domestic relationship
+  - Section 18 — Protection Order
+  - Section 19 — Residence Order
+  - Section 20 — Monetary Relief
+  - Section 21 — Child Custody Order
+  - Protection Officer: free assistance, complaint filing
+  - Emergency order within 3 days of complaint
+  - Section 498A IPC — dowry harassment (criminal parallel)
+  - Helplines: 181 (Women), 100 (Police)
+
+HMA 1955 (Hindu Marriage Act):
+  - Section 13 — Divorce grounds (cruelty, desertion, adultery, etc.)
+  - Section 13B — Mutual Consent Divorce procedure
+  - First Motion, 6-month cooling-off, Second Motion
+  - Cooling-off waiver: Amardeep Singh v. Harveen Kaur, SC 2017
+  - Section 25 — Permanent alimony
+  - Section 26 — Child custody
+  - Minimum separation: 1 year required for Section 13B
+
+================================================================================
+13. DEPLOYMENT NOTES
+================================================================================
+
+BACKEND (Render / Railway / Fly.io):
+  Start command:  uvicorn main:app --host 0.0.0.0 --port $PORT
+  Environment vars: GROQ_API_KEY, DEMO_MODE=false
+  Note: ChromaDB runs in-memory (re-seeded at startup). No persistent DB needed.
+  CORS: Currently allow_origins=["*"] — restrict to frontend domain in production.
+
+FRONTEND (Vercel):
+  Root directory: frontend
+  Build command:  npm run build
+  Output:         .next
+  Env var: NEXT_PUBLIC_BACKEND_URL=<your backend URL>
+
+BROWSER SUPPORT:
+  Web Speech API (mic): Chrome and Edge only.
+  Text input mode works on all browsers.
+
+================================================================================
+14. DISCLAIMER
+================================================================================
+
+Project Nyaya is NOT a law firm and does NOT provide legal advice.
+All documents generated are AI-assisted drafts for informational purposes only.
+
+Before filing any document, users should:
+  - Review with a qualified legal aid advocate or lawyer
+  - Fill in all blank/missing fields
+  - Verify act citations for their specific state/jurisdiction
+
+EMERGENCY CONTACTS:
+  Police:          100
+  Women Helpline:  181  (24x7, Free)
+  NALSA Legal Aid: 15100
+  One Stop Centre: 181
+
+================================================================================
+END OF DOCUMENTATION
+Project Nyaya | github.com/RajB-1003/Project-Nyaya
+================================================================================
