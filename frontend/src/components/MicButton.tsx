@@ -41,12 +41,36 @@ const LANGUAGES = [
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 
-// ── Extend window type for webkit ─────────────────────────────────────────────
+// ── TypeScript type declarations for Web Speech API ─────────────────────────
+// (not included in standard TS dom lib for Next.js)
+
+interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+  readonly message: string;
+}
+
+interface SpeechRecognition extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult:  ((event: SpeechRecognitionEvent) => void) | null;
+  onerror:   ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend:     (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
 
 declare global {
   interface Window {
     webkitSpeechRecognition: new () => SpeechRecognition;
-    SpeechRecognition: new () => SpeechRecognition;
+    SpeechRecognition:       new () => SpeechRecognition;
   }
 }
 
@@ -61,6 +85,7 @@ export default function MicButton({ onResult, onError }: MicButtonProps) {
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const finalRef       = useRef("");   // accumulates final text across utterances
+  const stoppedRef     = useRef(false); // true = user manually stopped, false = Chrome auto-stopped
 
   // ── Check browser support ──────────────────────────────────────────────────
 
@@ -113,6 +138,7 @@ export default function MicButton({ onResult, onError }: MicButtonProps) {
     const recognition = new SpeechAPI();
     recognitionRef.current = recognition;
     finalRef.current = "";
+    stoppedRef.current = false;
     setTranscript("");
     setInterimText("");
 
@@ -143,7 +169,10 @@ export default function MicButton({ onResult, onError }: MicButtonProps) {
     };
 
     recognition.onend = () => {
-      // Only auto-submit if we were still in recording state (not manually stopped)
+      // Chrome auto-stops after silence — restart if user hasn't clicked stop
+      if (!stoppedRef.current) {
+        try { recognition.start(); } catch { /* already starting */ }
+      }
     };
 
     recognition.start();
@@ -153,6 +182,7 @@ export default function MicButton({ onResult, onError }: MicButtonProps) {
   // ── Stop and submit ────────────────────────────────────────────────────────
 
   const stopAndSubmit = () => {
+    stoppedRef.current = true;          // signal onend NOT to restart
     recognitionRef.current?.stop();
     const captured = finalRef.current.trim();
     setInterimText("");
