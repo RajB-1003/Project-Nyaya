@@ -85,9 +85,9 @@ export default function Home() {
           <p className="text-sm text-slate-500 max-w-xs mx-auto leading-relaxed">
             Speak or type your legal concern — get clear, actionable guidance instantly.
           </p>
-          <div className="inline-block mt-1 px-3 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold ring-1 ring-amber-200">
+          {/* <div className="inline-block mt-1 px-3 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold ring-1 ring-amber-200">
             Not legal advice · For information only
-          </div>
+          </div> */}
         </header>
 
         {}

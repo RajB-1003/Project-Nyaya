@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useEffect } from "react";
 
-type AppStatus = "idle" | "recording" | "loading";
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type Status = "idle" | "recording" | "loading";
 
 interface MicButtonProps {
   onResult: (data: {
@@ -15,98 +17,208 @@ interface MicButtonProps {
     follow_up_question: string;
     transcribed_text: string;
     pdf_url: string;
+    context_source?: string;
+    sources_used?: string[];
   }) => void;
   onError: (msg: string) => void;
 }
 
+// ── Language options ───────────────────────────────────────────────────────────
+
+const LANGUAGES = [
+  { code: "en-IN",  label: "English (India)" },
+  { code: "hi-IN",  label: "हिन्दी (Hindi)" },
+  { code: "ta-IN",  label: "தமிழ் (Tamil)" },
+  { code: "te-IN",  label: "తెలుగు (Telugu)" },
+  { code: "kn-IN",  label: "ಕನ್ನಡ (Kannada)" },
+  { code: "ml-IN",  label: "മലയാളം (Malayalam)" },
+  { code: "mr-IN",  label: "मराठी (Marathi)" },
+  { code: "bn-IN",  label: "বাংলা (Bengali)" },
+  { code: "gu-IN",  label: "ગુજરાતી (Gujarati)" },
+  { code: "pa-IN",  label: "ਪੰਜਾਬੀ (Punjabi)" },
+  { code: "ur-IN",  label: "اردو (Urdu)" },
+];
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 
+// ── Extend window type for webkit ─────────────────────────────────────────────
+
+declare global {
+  interface Window {
+    webkitSpeechRecognition: new () => SpeechRecognition;
+    SpeechRecognition: new () => SpeechRecognition;
+  }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function MicButton({ onResult, onError }: MicButtonProps) {
-  const [status, setStatus] = useState<AppStatus>("idle");
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const [status, setStatus]           = useState<Status>("idle");
+  const [lang, setLang]               = useState("en-IN");
+  const [transcript, setTranscript]   = useState("");   // live display
+  const [interimText, setInterimText] = useState("");   // grey interim words
+  const [supported, setSupported]     = useState(true);
 
-  const startRecording = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : "audio/webm";
-      const recorder = new MediaRecorder(stream, { mimeType });
-      chunksRef.current = [];
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const finalRef       = useRef("");   // accumulates final text across utterances
 
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
+  // ── Check browser support ──────────────────────────────────────────────────
 
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        setStatus("loading");
-
-        const blob = new Blob(chunksRef.current, { type: mimeType });
-        const formData = new FormData();
-        formData.append("audio", blob, "recording.webm");
-
-        try {
-          const res = await fetch(`${BACKEND_URL}/api/process`, {
-            method: "POST",
-            body: formData,
-          });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({ detail: "Server error" }));
-            throw new Error(err.detail ?? "Unknown server error");
-          }
-          const data = await res.json();
-          onResult(data);
-        } catch (err: unknown) {
-          onError(err instanceof Error ? err.message : "Failed to process audio");
-        } finally {
-          setStatus("idle");
-        }
-      };
-
-      recorder.start();
-      mediaRecorderRef.current = recorder;
-      setStatus("recording");
-    } catch {
-      onError("Microphone access denied. Please allow microphone permission and try again.");
-    }
-  }, [onResult, onError]);
-
-  const stopRecording = useCallback(() => {
-    mediaRecorderRef.current?.stop();
+  useEffect(() => {
+    const SpeechAPI =
+      typeof window !== "undefined"
+        ? window.SpeechRecognition ?? window.webkitSpeechRecognition
+        : null;
+    if (!SpeechAPI) setSupported(false);
   }, []);
 
-  const handleClick = () => {
-    if (status === "idle") startRecording();
-    else if (status === "recording") stopRecording();
+  // ── Submit transcript to /api/analyze ──────────────────────────────────────
+
+  const submitTranscript = async (text: string) => {
+    if (!text.trim()) {
+      onError("No speech detected. Please try again.");
+      setStatus("idle");
+      return;
+    }
+    setStatus("loading");
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { detail?: string }).detail ?? `Server error ${res.status}`);
+      }
+      const data = await res.json();
+      onResult({ ...data, transcribed_text: text.trim() });
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Analysis failed");
+    } finally {
+      setStatus("idle");
+    }
   };
 
+  // ── Start recognition ──────────────────────────────────────────────────────
+
+  const startRecording = () => {
+    const SpeechAPI =
+      window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!SpeechAPI) {
+      onError("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
+      return;
+    }
+
+    const recognition = new SpeechAPI();
+    recognitionRef.current = recognition;
+    finalRef.current = "";
+    setTranscript("");
+    setInterimText("");
+
+    recognition.lang = lang;
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interimAccum = "";
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalRef.current += " " + result[0].transcript;
+        } else {
+          interimAccum += result[0].transcript;
+        }
+      }
+      setTranscript(finalRef.current.trim());
+      setInterimText(interimAccum);
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (event.error === "no-speech") return; // ignore — user just paused
+      if (event.error === "aborted") return;   // we stopped it manually
+      onError(`Speech error: ${event.error}`);
+      setStatus("idle");
+    };
+
+    recognition.onend = () => {
+      // Only auto-submit if we were still in recording state (not manually stopped)
+    };
+
+    recognition.start();
+    setStatus("recording");
+  };
+
+  // ── Stop and submit ────────────────────────────────────────────────────────
+
+  const stopAndSubmit = () => {
+    recognitionRef.current?.stop();
+    const captured = finalRef.current.trim();
+    setInterimText("");
+    submitTranscript(captured);
+  };
+
+  // ── Click handler ──────────────────────────────────────────────────────────
+
+  const handleClick = () => {
+    if (status === "idle")      startRecording();
+    else if (status === "recording") stopAndSubmit();
+  };
+
+  // ── Unsupported browser fallback ───────────────────────────────────────────
+
+  if (!supported) {
+    return (
+      <div className="text-center text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+        ⚠ Speech recognition requires <strong>Chrome or Edge</strong>.
+        <br />Use the <strong>Type Issue</strong> tab instead.
+      </div>
+    );
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-4 w-full">
+
+      {/* Language selector */}
+      <div className="w-full">
+        <label className="block text-xs font-semibold text-slate-500 mb-1">
+          🌐 Speak in:
+        </label>
+        <select
+          value={lang}
+          onChange={(e) => setLang(e.target.value)}
+          disabled={status === "recording" || status === "loading"}
+          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50"
+        >
+          {LANGUAGES.map((l) => (
+            <option key={l.code} value={l.code}>{l.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Mic button */}
       <button
         onClick={handleClick}
         disabled={status === "loading"}
         aria-label={
-          status === "idle"
-            ? "Start Recording"
-            : status === "recording"
-            ? "Stop Recording"
-            : "Processing…"
+          status === "idle"      ? "Start Recording" :
+          status === "recording" ? "Stop and Analyse" : "Processing…"
         }
         className={`
           relative w-28 h-28 rounded-full flex items-center justify-center
           shadow-2xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-offset-2
-          ${
-            status === "idle"
-              ? "bg-gradient-to-br from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 focus:ring-blue-400 hover:scale-105"
-              : status === "recording"
-              ? "bg-gradient-to-br from-red-500 to-rose-700 focus:ring-red-400 scale-110"
-              : "bg-gradient-to-br from-slate-400 to-slate-500 cursor-not-allowed"
+          ${status === "idle"
+            ? "bg-gradient-to-br from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 focus:ring-blue-400 hover:scale-105"
+            : status === "recording"
+            ? "bg-gradient-to-br from-red-500 to-rose-700 focus:ring-red-400 scale-110"
+            : "bg-gradient-to-br from-slate-400 to-slate-500 cursor-not-allowed"
           }
         `}
       >
-        {}
+        {/* Pulse rings when recording */}
         {status === "recording" && (
           <>
             <span className="absolute inset-0 rounded-full bg-red-400 opacity-40 animate-ping" />
@@ -114,6 +226,7 @@ export default function MicButton({ onResult, onError }: MicButtonProps) {
           </>
         )}
 
+        {/* Mic icon */}
         {status === "idle" && (
           <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 1a3 3 0 0 1 3 3v8a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z" />
@@ -121,12 +234,14 @@ export default function MicButton({ onResult, onError }: MicButtonProps) {
           </svg>
         )}
 
+        {/* Stop icon */}
         {status === "recording" && (
           <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
             <rect x="6" y="6" width="12" height="12" rx="2" />
           </svg>
         )}
 
+        {/* Spinner */}
         {status === "loading" && (
           <svg className="w-12 h-12 text-white animate-spin" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -135,11 +250,32 @@ export default function MicButton({ onResult, onError }: MicButtonProps) {
         )}
       </button>
 
+      {/* Status label */}
       <p className="text-sm font-medium tracking-wide text-slate-500 uppercase">
-        {status === "idle" && "Tap to speak"}
-        {status === "recording" && "Recording… tap to stop"}
-        {status === "loading" && "Analysing your issue…"}
+        {status === "idle"      && "Tap to speak"}
+        {status === "recording" && "Listening… tap to stop & analyse"}
+        {status === "loading"   && "Analysing your issue…"}
       </p>
+
+      {/* Live transcript box */}
+      {(transcript || interimText) && (
+        <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 min-h-[60px]">
+          <span>{transcript}</span>
+          {interimText && (
+            <span className="text-slate-400 italic"> {interimText}</span>
+          )}
+        </div>
+      )}
+
+      {/* Submit button (if user stopped but wants to manually trigger) */}
+      {status === "idle" && transcript && (
+        <button
+          onClick={() => submitTranscript(transcript)}
+          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition-colors"
+        >
+          Analyse This →
+        </button>
+      )}
     </div>
   );
 }
