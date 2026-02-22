@@ -74,7 +74,7 @@ export default function Home() {
     <main className="min-h-screen bg-gradient-to-b from-slate-50 via-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-md mx-auto space-y-6">
 
-        {/* Header */}
+        {}
         <header className="text-center space-y-2">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 shadow-lg mb-2">
             <Scale className="w-7 h-7 text-white" />
@@ -90,11 +90,11 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Input panel (hidden after result) */}
+        {}
         {!result && (
           <section className="bg-white rounded-3xl shadow-xl border border-slate-100 py-8 px-6 space-y-5">
 
-            {/* Mode toggle */}
+            {}
             <div className="flex rounded-xl overflow-hidden border border-slate-200 text-sm font-semibold">
               <button
                 onClick={() => setInputMode("text")}
@@ -118,7 +118,7 @@ export default function Home() {
               </button>
             </div>
 
-            {/* ── Text mode ── */}
+            {}
             {inputMode === "text" && (
               <div className="space-y-3">
                 <label className="block text-sm font-semibold text-slate-700">
@@ -159,7 +159,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* ── Mic mode ── */}
+            {}
             {inputMode === "mic" && (
               <div className="flex flex-col items-center space-y-4">
                 <MicButton onResult={handleResult} onError={handleError} />
@@ -170,7 +170,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* Error */}
+            {}
             {errorMsg && (
               <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
                 <p className="text-sm text-red-600 font-medium">{errorMsg}</p>
@@ -187,7 +187,7 @@ export default function Home() {
           </section>
         )}
 
-        {/* Results */}
+        {}
         {result && (
           <>
             <ResultCard
@@ -205,7 +205,7 @@ export default function Home() {
               <Timeline intent={result.intent_detected} />
             )}
 
-            {/* Agentic Form CTA */}
+            {}
             {!result.kill_switch_triggered && (
               <div className="bg-gradient-to-br from-indigo-900 to-blue-900 rounded-2xl p-5 border border-indigo-700 shadow-lg">
                 <div className="flex items-start gap-3">
@@ -237,7 +237,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* Context source badge */}
+            {}
             {result.context_source && (
               <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
                 <span className={`px-2 py-0.5 rounded-full font-semibold ${
@@ -266,14 +266,14 @@ export default function Home() {
           </>
         )}
 
-        {/* Footer */}
+        {}
         <footer className="text-center text-xs text-slate-400 pb-4 space-y-1">
           <p>Project Nyaya is not a law firm and does not provide legal counsel.</p>
           <p>In emergencies: Police <strong>100</strong> · Women Helpline <strong>181</strong></p>
         </footer>
       </div>
 
-      {/* Form Collector Modal */}
+      {}
       {showForm && result && (
         <FormCollector
           intent={result.intent_detected}

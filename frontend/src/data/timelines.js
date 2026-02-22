@@ -1,8 +1,4 @@
-/**
- * timelines.js
- * Hardcoded step-by-step legal procedure arrays for Project Nyaya.
- * Each step has: { id, title, description }
- */
+
 
 export const RTI_TIMELINE = [
   {

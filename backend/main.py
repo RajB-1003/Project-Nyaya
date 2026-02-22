@@ -1,3 +1,4 @@
+
 """
 Project Nyaya — FastAPI Backend v5.0
 Voice-first legal triage for marginalized communities.
@@ -29,9 +30,9 @@ from fpdf import FPDF
 
 from web_fetcher import fetch_government_context, get_available_sources, GOVERNMENT_SOURCES
 
-# ---------------------------------------------------------------------------
-# Bootstrap
-# ---------------------------------------------------------------------------
+                                                                             
+           
+                                                                             
 
 load_dotenv()
 DEMO_MODE: bool = os.getenv("DEMO_MODE", "false").lower() == "true"
@@ -58,18 +59,18 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# ---------------------------------------------------------------------------
-# ChromaDB — Semantic Retrieval Engine
-# ---------------------------------------------------------------------------
-# Uses ONNXMiniLM-L6-v2 (built into chromadb, no torch required, ~23MB)
-# In-memory store: repopulated on every server start from LEGAL_CHUNKS below.
-# ---------------------------------------------------------------------------
+                                                                             
+                                      
+                                                                             
+                                                                       
+                                                                             
+                                                                             
 
 _chroma_client = chromadb.Client()
 _embed_fn = ONNXMiniLM_L6_V2()
 
 LEGAL_CHUNKS = [
-    # ── RTI Act, 2005 ──────────────────────────────────────────────────────
+                                                                             
     {
         "id": "rti_scope_definition",
         "topic": "RTI",
@@ -177,7 +178,7 @@ LEGAL_CHUNKS = [
         ),
     },
 
-    # ── Protection of Women from Domestic Violence Act, 2005 ───────────────
+                                                                             
     {
         "id": "dv_definition_types",
         "topic": "Domestic Violence",
@@ -271,7 +272,7 @@ LEGAL_CHUNKS = [
         ),
     },
 
-    # ── Hindu Marriage Act, 1955 — Divorce ────────────────────────────────
+                                                                            
     {
         "id": "divorce_eligibility_types",
         "topic": "Divorce",
@@ -369,9 +370,9 @@ LEGAL_CHUNKS = [
     },
 ]
 
-# ---------------------------------------------------------------------------
-# Build / rebuild the ChromaDB collection at module load
-# ---------------------------------------------------------------------------
+                                                                             
+                                                        
+                                                                             
 
 
 def _build_vector_store() -> chromadb.Collection:
@@ -394,7 +395,7 @@ def _build_vector_store() -> chromadb.Collection:
     return collection
 
 
-# Build the store at import time (first request might be slightly slower)
+                                                                         
 _collection: chromadb.Collection = _build_vector_store()
 
 
@@ -408,17 +409,17 @@ def semantic_retrieve(query: str, n_results: int = 4) -> str:
         n_results=n_results,
         include=["documents", "metadatas"],
     )
-    docs = results["documents"][0]        # list of chunk texts
-    metas = results["metadatas"][0]       # list of metadata dicts
+    docs = results["documents"][0]                             
+    metas = results["metadatas"][0]                               
     context_parts = []
     for doc, meta in zip(docs, metas):
         context_parts.append(f"[{meta['topic']} — {meta['section']}]\n{doc}")
     return "\n\n".join(context_parts)
 
 
-# ---------------------------------------------------------------------------
-# Audio MIME types
-# ---------------------------------------------------------------------------
+                                                                             
+                  
+                                                                             
 
 AUDIO_MIME_MAP = {
     ".webm": "audio/webm",
@@ -435,9 +436,9 @@ def get_mime_type(suffix: str) -> str:
     return AUDIO_MIME_MAP.get(suffix.lower(), "audio/webm")
 
 
-# ---------------------------------------------------------------------------
-# Demo-mode canned responses (no API calls)
-# ---------------------------------------------------------------------------
+                                                                             
+                                           
+                                                                             
 
 DEMO_RESPONSES = {
     "RTI": {
@@ -526,9 +527,9 @@ def _demo_process(intent_key: str = "RTI") -> dict:
     return DEMO_RESPONSES.get(intent_key, DEMO_RESPONSES["RTI"])
 
 
-# ---------------------------------------------------------------------------
-# Pydantic schemas
-# ---------------------------------------------------------------------------
+                                                                             
+                  
+                                                                             
 
 
 class AnalyzeRequest(BaseModel):
@@ -568,14 +569,14 @@ class GeneratePdfRequest(BaseModel):
     sources_used: List[str] = []
 
 
-# ---------------------------------------------------------------------------
-# Form extraction — Pydantic models & extraction prompt
-# ---------------------------------------------------------------------------
+                                                                             
+                                                       
+                                                                             
 
 
 class FormExtractRequest(BaseModel):
-    text: str              # user's transcribed voice statement
-    intent: str            # "RTI" | "Domestic Violence" | "Divorce"
+    text: str                                                  
+    intent: str                                                     
 
 
 class RTIFormData(BaseModel):
@@ -636,16 +637,16 @@ class DivorceFormData(BaseModel):
     property_settled: str | None = None
 
 
-# Unified response for the front-end form collector
+                                                   
 class FormExtractResponse(BaseModel):
     intent: str
-    form_data: dict                   # the extracted fields (may have nulls)
-    missing_fields: List[str]         # list of field names that are still null
-    missing_questions: List[str]      # human-readable questions to ask the user
+    form_data: dict                                                          
+    missing_fields: List[str]                                                  
+    missing_questions: List[str]                                                
 
 
-# Prompt for field extraction
-# Note: uses __SCHEMA__ and __TEXT__ as tokens (not {}) to avoid .format() conflicts with JSON braces
+                             
+                                                                                                     
 FORM_EXTRACT_PROMPT = """\
 You are a form-filling assistant for an Indian legal app named Nyaya.
 
@@ -721,7 +722,7 @@ _DIVORCE_SCHEMA = """{
   "property_settled": string|null
 }"""
 
-# Human-readable questions for each null field
+                                              
 _RTI_QUESTIONS = {
     "name": "What is your full name?",
     "address": "What is your complete postal address?",
@@ -792,9 +793,9 @@ def _get_missing(data: dict, intent: str) -> tuple[list[str], list[str]]:
     return missing_fields, missing_questions
 
 
-# ---------------------------------------------------------------------------
-# Groq — LLM Analysis
-# ---------------------------------------------------------------------------
+                                                                             
+                     
+                                                                             
 
 
 SYSTEM_PROMPT = """You are Nyaya, an expert Indian legal information assistant specialising in RTI, Domestic Violence, and Divorce law.
@@ -851,23 +852,23 @@ async def _call_groq_analyze(text: str) -> IntentResult:
          - If web fetch fails     → context_source = "RAG"  (pure fallback)
       4. Call Groq Llama 3.3-70b with the fused context.
     """
-    # ── Step 1: Semantic retrieval (fast, in-process) ─────────────────────
+                                                                            
     rag_context = semantic_retrieve(text, n_results=3)
 
-    # Peek at the top chunk's topic to choose which portal to hit
+                                                                 
     top_results = _collection.query(
         query_texts=[text],
         n_results=1,
         include=["metadatas"],
     )
-    dominant_intent: str = "RTI"  # default
+    dominant_intent: str = "RTI"           
     if top_results["metadatas"] and top_results["metadatas"][0]:
         dominant_intent = top_results["metadatas"][0][0].get("topic", "RTI")
 
-    # ── Step 2: Live government portal fetch (async, with timeout) ────────
+                                                                            
     web_context, sources_used = await fetch_government_context(dominant_intent)
 
-    # ── Step 3: Fuse contexts ─────────────────────────────────────────────
+                                                                            
     if web_context and len(web_context) >= 300:
         context_source = "WEB+RAG"
         fused_context = (
@@ -884,7 +885,7 @@ async def _call_groq_analyze(text: str) -> IntentResult:
             f"{rag_context}"
         )
 
-    # ── Step 4: LLM call (sync Groq SDK, run in thread to not block event loop) ──
+                                                                                   
     prompt = (
         f'User\'s statement (translated to English): "{text}"\n\n'
         f"Context (priority: use government portal data first if available):\n"
@@ -905,16 +906,16 @@ async def _call_groq_analyze(text: str) -> IntentResult:
     raw = response.choices[0].message.content
     data = json.loads(raw)
 
-    # Inject pipeline metadata (not part of LLM output)
+                                                       
     data["context_source"] = context_source
     data["sources_used"] = sources_used
 
     return IntentResult(**data)
 
 
-# ---------------------------------------------------------------------------
-# PDF builder
-# ---------------------------------------------------------------------------
+                                                                             
+             
+                                                                             
 
 
 def _build_pdf(data: GeneratePdfRequest, pdf_path: Path) -> None:
@@ -922,7 +923,7 @@ def _build_pdf(data: GeneratePdfRequest, pdf_path: Path) -> None:
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
-    # Header bar
+                
     pdf.set_fill_color(30, 58, 138)
     pdf.rect(0, 0, 210, 28, "F")
     pdf.set_font("Helvetica", "B", 18)
@@ -933,7 +934,7 @@ def _build_pdf(data: GeneratePdfRequest, pdf_path: Path) -> None:
     pdf.set_xy(10, 20)
     pdf.cell(0, 6, "This document is for informational purposes only. It is NOT legal advice.", ln=True)
 
-    # Intent badge
+                  
     pdf.set_text_color(30, 58, 138)
     pdf.set_font("Helvetica", "B", 14)
     pdf.set_xy(10, 34)
@@ -942,7 +943,7 @@ def _build_pdf(data: GeneratePdfRequest, pdf_path: Path) -> None:
     pdf.set_draw_color(203, 213, 225)
     pdf.line(10, 44, 200, 44)
 
-    # User issue
+                
     pdf.set_text_color(30, 41, 59)
     pdf.set_font("Helvetica", "B", 11)
     pdf.set_xy(10, 48)
@@ -951,7 +952,7 @@ def _build_pdf(data: GeneratePdfRequest, pdf_path: Path) -> None:
     pdf.set_xy(10, 56)
     pdf.multi_cell(190, 6, data.extracted_user_issue)
 
-    # Explanation
+                 
     y = pdf.get_y() + 4
     pdf.set_font("Helvetica", "B", 11)
     pdf.set_xy(10, y)
@@ -960,7 +961,7 @@ def _build_pdf(data: GeneratePdfRequest, pdf_path: Path) -> None:
     pdf.set_xy(10, pdf.get_y())
     pdf.multi_cell(190, 6, data.simplified_explanation)
 
-    # Relevant Acts
+                   
     if data.relevant_acts:
         y = pdf.get_y() + 4
         pdf.set_font("Helvetica", "B", 11)
@@ -971,7 +972,7 @@ def _build_pdf(data: GeneratePdfRequest, pdf_path: Path) -> None:
             pdf.set_xy(10, pdf.get_y())
             pdf.multi_cell(190, 6, f"  \u00a7 {act}")
 
-    # Action steps
+                  
     y = pdf.get_y() + 4
     pdf.set_font("Helvetica", "B", 11)
     pdf.set_xy(10, y)
@@ -981,7 +982,7 @@ def _build_pdf(data: GeneratePdfRequest, pdf_path: Path) -> None:
         pdf.set_xy(10, pdf.get_y())
         pdf.multi_cell(190, 6, f"  {i}. {step}")
 
-    # Follow-up question
+                        
     if data.follow_up_question:
         y = pdf.get_y() + 4
         pdf.set_fill_color(255, 249, 219)
@@ -991,7 +992,7 @@ def _build_pdf(data: GeneratePdfRequest, pdf_path: Path) -> None:
         pdf.set_xy(10, y)
         pdf.multi_cell(190, 6, f"  Clarifying Question: {data.follow_up_question}", border=1, fill=True)
 
-    # Kill-switch warning
+                         
     if data.kill_switch_triggered:
         y = pdf.get_y() + 6
         pdf.set_fill_color(254, 226, 226)
@@ -1006,7 +1007,7 @@ def _build_pdf(data: GeneratePdfRequest, pdf_path: Path) -> None:
             border=1, fill=True,
         )
 
-    # Footer
+            
     pdf.set_text_color(100, 116, 139)
     pdf.set_font("Helvetica", "I", 8)
     pdf.set_xy(10, 280)
@@ -1014,9 +1015,9 @@ def _build_pdf(data: GeneratePdfRequest, pdf_path: Path) -> None:
     pdf.output(str(pdf_path))
 
 
-# ---------------------------------------------------------------------------
-# Route 1 — /api/transcribe
-# ---------------------------------------------------------------------------
+                                                                             
+                           
+                                                                             
 
 
 @app.post("/api/transcribe")
@@ -1040,9 +1041,9 @@ async def transcribe(audio: UploadFile = File(...)):
             tmp_path.unlink()
 
 
-# ---------------------------------------------------------------------------
-# Route 2 — /api/analyze
-# ---------------------------------------------------------------------------
+                                                                             
+                        
+                                                                             
 
 
 @app.post("/api/analyze", response_model=IntentResult)
@@ -1056,9 +1057,9 @@ async def analyze(request: AnalyzeRequest):
         raise HTTPException(status_code=502, detail=f"Groq analysis error: {exc}") from exc
 
 
-# ---------------------------------------------------------------------------
-# Route 3 — /api/generate_pdf
-# ---------------------------------------------------------------------------
+                                                                             
+                             
+                                                                             
 
 
 @app.post("/api/generate_pdf")
@@ -1069,9 +1070,9 @@ async def generate_pdf(request: GeneratePdfRequest):
     return {"pdf_url": f"/static/{pdf_filename}", "pdf_filename": pdf_filename}
 
 
-# ---------------------------------------------------------------------------
-# Route 4 — /api/process  (Master chain)
-# ---------------------------------------------------------------------------
+                                                                             
+                                        
+                                                                             
 
 
 @app.post("/api/process")
@@ -1080,7 +1081,7 @@ async def process(audio: UploadFile = File(...)):
     Full pipeline: audio → Whisper → semantic retrieval → Llama analysis → PDF.
     Set DEMO_MODE=true in .env to bypass all API calls.
     """
-    # ── DEMO SHORT-CIRCUIT ─────────────────────────────────────────────────
+                                                                             
     if DEMO_MODE:
         size = len(await audio.read())
         demo = _demo_process("RTI" if size < 20000 else "Domestic Violence" if size < 60000 else "Divorce")
@@ -1091,9 +1092,9 @@ async def process(audio: UploadFile = File(...)):
             STATIC_DIR / pdf_filename,
         )
         return JSONResponse({**demo, "pdf_url": f"/static/{pdf_filename}"})
-    # ── END DEMO ───────────────────────────────────────────────────────────
+                                                                             
 
-    # Step 1 — Transcribe
+                         
     suffix = Path(audio.filename or "audio.webm").suffix or ".webm"
     tmp_path = Path(tempfile.mktemp(suffix=suffix))
     try:
@@ -1111,7 +1112,7 @@ async def process(audio: UploadFile = File(...)):
         if tmp_path.exists():
             tmp_path.unlink()
 
-    # Step 2 — Semantic retrieve + Analyze
+                                          
     try:
         result = await _call_groq_analyze(text)
     except json.JSONDecodeError as exc:
@@ -1119,7 +1120,7 @@ async def process(audio: UploadFile = File(...)):
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Groq analysis error: {exc}") from exc
 
-    # Step 3 — PDF
+                  
     pdf_id = uuid.uuid4().hex
     pdf_filename = f"nyaya_{pdf_id}.pdf"
     _build_pdf(GeneratePdfRequest(**result.model_dump()), STATIC_DIR / pdf_filename)
@@ -1131,9 +1132,9 @@ async def process(audio: UploadFile = File(...)):
     })
 
 
-# ---------------------------------------------------------------------------
-# Debug endpoint — inspect retrieved chunks for a given query
-# ---------------------------------------------------------------------------
+                                                                             
+                                                             
+                                                                             
 
 
 @app.get("/api/debug/retrieve")
@@ -1190,9 +1191,9 @@ async def debug_sources(intent: str = None):
     }
 
 
-# ---------------------------------------------------------------------------
-# Route 6 — /api/extract_form  (AI field extraction from voice text)
-# ---------------------------------------------------------------------------
+                                                                             
+                                                                    
+                                                                             
 
 
 @app.post("/api/extract_form", response_model=FormExtractResponse)
@@ -1236,9 +1237,9 @@ async def extract_form(request: FormExtractRequest):
     )
 
 
-# ---------------------------------------------------------------------------
-# Route 7 — /api/generate_form_pdf  (build filled legal document PDF)
-# ---------------------------------------------------------------------------
+                                                                             
+                                                                     
+                                                                             
 
 
 @app.post("/api/generate_form_pdf")

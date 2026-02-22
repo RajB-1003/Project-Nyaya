@@ -106,7 +106,7 @@ export default function MicButton({ onResult, onError }: MicButtonProps) {
           }
         `}
       >
-        {/* Pulse ring when recording */}
+        {}
         {status === "recording" && (
           <>
             <span className="absolute inset-0 rounded-full bg-red-400 opacity-40 animate-ping" />

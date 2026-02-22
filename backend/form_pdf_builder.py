@@ -1,3 +1,4 @@
+
 ﻿"""
 form_pdf_builder.py -- Project Nyaya
 Generates formatted government legal document drafts as PDFs.
@@ -12,25 +13,25 @@ Three document types:
 from pathlib import Path
 from fpdf import FPDF
 
-# Colour palette (RGB tuples)
-C_HEADER    = (30,  58, 138)   # dark navy  for title bar
-C_ACCENT    = (37,  99, 235)   # blue       for section headers
-C_GRAY      = (100, 116, 139)  # slate      for helper text
-C_BLACK     = (15,  23,  42)   # near-black
-C_MISSING   = (180, 60,  0)    # amber-red  for blank fields
-C_FILLED    = (0,   100, 0)    # green      for filled fields
+                             
+C_HEADER    = (30,  58, 138)                             
+C_ACCENT    = (37,  99, 235)                                   
+C_GRAY      = (100, 116, 139)                              
+C_BLACK     = (15,  23,  42)               
+C_MISSING   = (180, 60,  0)                                 
+C_FILLED    = (0,   100, 0)                                  
 
 BLANK       = "_________________________________"
 BLANK_SHORT = "__________________"
 
 
-# ---------------------------------------------------------------------------
-# Shared layout helpers
-# ---------------------------------------------------------------------------
+                                                                             
+                       
+                                                                             
 
 def _start(pdf: FPDF, title: str, subtitle: str, note: str) -> None:
     """Render the Nyaya header + document title block."""
-    # Top nav bar
+                 
     pdf.set_fill_color(*C_HEADER)
     pdf.rect(0, 0, 210, 28, "F")
     pdf.set_text_color(255, 255, 255)
@@ -44,7 +45,7 @@ def _start(pdf: FPDF, title: str, subtitle: str, note: str) -> None:
     pdf.set_xy(10, 20)
     pdf.cell(190, 5, note, align="C")
 
-    # Doc title
+               
     pdf.set_fill_color(*C_ACCENT)
     pdf.set_text_color(255, 255, 255)
     pdf.set_xy(10, 31)
@@ -179,9 +180,9 @@ def _info_box(pdf: FPDF, heading: str, lines_text: str) -> None:
     pdf.ln(5)
 
 
-# ---------------------------------------------------------------------------
-# Builder 1: RTI Application
-# ---------------------------------------------------------------------------
+                                                                             
+                            
+                                                                             
 
 def build_rti_pdf(data: dict, pdf_path: Path) -> None:
     """RTI Application -- Section 6, RTI Act 2005."""
@@ -253,9 +254,9 @@ def build_rti_pdf(data: dict, pdf_path: Path) -> None:
     pdf.output(str(pdf_path))
 
 
-# ---------------------------------------------------------------------------
-# Builder 2: Domestic Violence Complaint
-# ---------------------------------------------------------------------------
+                                                                             
+                                        
+                                                                             
 
 def build_dv_pdf(data: dict, pdf_path: Path) -> None:
     """DV Complaint -- PWDVA 2005, to Protection Officer / Police."""
@@ -346,9 +347,9 @@ def build_dv_pdf(data: dict, pdf_path: Path) -> None:
     pdf.output(str(pdf_path))
 
 
-# ---------------------------------------------------------------------------
-# Builder 3: Mutual Consent Divorce Petition (Section 13B, HMA 1955)
-# ---------------------------------------------------------------------------
+                                                                             
+                                                                    
+                                                                             
 
 def build_divorce_pdf(data: dict, pdf_path: Path) -> None:
     """Section 13B Mutual Consent Divorce Petition Draft."""

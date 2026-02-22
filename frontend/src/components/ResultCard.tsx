@@ -33,7 +33,7 @@ export default function ResultCard({
 
   return (
     <div className="w-full rounded-2xl bg-white shadow-xl border border-slate-100 overflow-hidden">
-      {/* Top accent bar */}
+      {}
       <div
         className={`h-1.5 w-full ${
           killSwitchTriggered
@@ -43,7 +43,7 @@ export default function ResultCard({
       />
 
       <div className="p-5 space-y-4">
-        {/* Intent badge + transcription */}
+        {}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <span
             className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ring-1 ${badgeClass}`}
@@ -57,7 +57,7 @@ export default function ResultCard({
           )}
         </div>
 
-        {/* Kill-switch warning */}
+        {}
         {killSwitchTriggered && (
           <div className="flex items-start gap-3 rounded-xl bg-red-50 border border-red-200 p-4">
             <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -68,10 +68,10 @@ export default function ResultCard({
           </div>
         )}
 
-        {/* Normal response */}
+        {}
         {!killSwitchTriggered && (
           <>
-            {/* User issue summary */}
+            {}
             <div className="bg-slate-50 rounded-lg px-4 py-3 border border-slate-100">
               <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">
                 Your Issue
@@ -79,7 +79,7 @@ export default function ResultCard({
               <p className="text-sm text-slate-600">{extractedUserIssue}</p>
             </div>
 
-            {/* Explanation */}
+            {}
             <div>
               <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">
                 What This Means
@@ -87,7 +87,7 @@ export default function ResultCard({
               <p className="text-sm text-slate-700 leading-relaxed">{simplifiedExplanation}</p>
             </div>
 
-            {/* Relevant Acts & Sections */}
+            {}
             {relevantActs.length > 0 && (
               <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-4">
                 <div className="flex items-center gap-2 mb-2">
@@ -115,7 +115,7 @@ export default function ResultCard({
               </div>
             )}
 
-            {/* Action steps checklist */}
+            {}
             <div>
               <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">
                 Immediate Action Steps
@@ -130,7 +130,7 @@ export default function ResultCard({
               </ul>
             </div>
 
-            {/* Follow-up question */}
+            {}
             {followUpQuestion && (
               <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 p-3">
                 <HelpCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
@@ -145,7 +145,7 @@ export default function ResultCard({
           </>
         )}
 
-        {/* Kill-switch action steps */}
+        {}
         {killSwitchTriggered && immediateActionSteps.length > 0 && (
           <ul className="space-y-2 mt-1">
             {immediateActionSteps.map((step, idx) => (

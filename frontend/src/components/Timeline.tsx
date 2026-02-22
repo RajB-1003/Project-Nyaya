@@ -26,7 +26,7 @@ export default function Timeline({ intent }: TimelineProps) {
             const isLast = idx === steps.length - 1;
             return (
               <li key={step.id} className="relative flex gap-4">
-                {/* Vertical connector line */}
+                {}
                 {!isLast && (
                   <span
                     className="absolute left-5 top-10 bottom-0 w-px bg-indigo-100"
@@ -34,12 +34,12 @@ export default function Timeline({ intent }: TimelineProps) {
                   />
                 )}
 
-                {/* Step circle */}
+                {}
                 <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-bold shadow-md z-10">
                   {step.id}
                 </div>
 
-                {/* Content */}
+                {}
                 <div className={`pb-6 ${isLast ? "pb-0" : ""}`}>
                   <p className="font-semibold text-slate-800 text-sm leading-snug">
                     {step.title}
@@ -53,7 +53,7 @@ export default function Timeline({ intent }: TimelineProps) {
           })}
         </ol>
 
-        {/* Completion indicator */}
+        {}
         <div className="mt-4 flex items-center gap-2 text-xs text-emerald-600 font-medium bg-emerald-50 rounded-lg px-3 py-2">
           <CheckCircle2 className="w-4 h-4" />
           Follow these steps carefully. Seek a legal aid advocate for personalised guidance.

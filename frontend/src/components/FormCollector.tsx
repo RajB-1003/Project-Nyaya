@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface FormCollectorProps {
   intent: string;
@@ -17,10 +16,9 @@ interface FormExtractResponse {
   missing_questions: string[];
 }
 
-// ─── Field label map (identifier → display name) ─────────────────────────────
 
 const FIELD_LABELS: Record<string, string> = {
-  // RTI
+
   name: "Full Name",
   address: "Complete Address",
   phone: "Phone Number",
@@ -33,7 +31,7 @@ const FIELD_LABELS: Record<string, string> = {
   time_period: "Time Period of Information",
   format_required: "Format Required",
   fee_payment_mode: "Fee Payment Mode",
-  // DV
+
   complainant_name: "Your Full Name",
   complainant_age: "Your Age",
   complainant_address: "Your Safe Address",
@@ -47,7 +45,7 @@ const FIELD_LABELS: Record<string, string> = {
   witnesses: "Witness Names & Contact",
   children: "Children (Name & Age)",
   relief_monetary_amount: "Monetary Relief Sought (Rs.)",
-  // Divorce
+
   petitioner1_name: "Petitioner 1 Full Name",
   petitioner1_age: "Petitioner 1 Age",
   petitioner1_address: "Petitioner 1 Address",
@@ -80,7 +78,6 @@ const INTENT_TITLES: Record<string, string> = {
   Divorce: "Mutual Consent Divorce Petition — Section 13B, HMA 1955",
 };
 
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function FormCollector({ intent, transcribedText, onClose }: FormCollectorProps) {
   const [step, setStep] = useState<"loading" | "filling" | "generating" | "done">("loading");
@@ -90,7 +87,6 @@ export default function FormCollector({ intent, transcribedText, onClose }: Form
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // ─── Step 1: Extract fields from voice on mount ──────────────────────────
 
   useState(() => {
     const extract = async () => {
@@ -114,13 +110,11 @@ export default function FormCollector({ intent, transcribedText, onClose }: Form
     extract();
   });
 
-  // ─── Step 2: Update field value ──────────────────────────────────────────
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // ─── Step 3: Generate filled PDF ─────────────────────────────────────────
 
   const generatePdf = async () => {
     setStep("generating");
@@ -140,7 +134,6 @@ export default function FormCollector({ intent, transcribedText, onClose }: Form
     }
   };
 
-  // ─── Render helpers ───────────────────────────────────────────────────────
 
   const renderField = (field: string, question: string, isMissing: boolean) => {
     const label = FIELD_LABELS[field] || field;
@@ -178,7 +171,6 @@ export default function FormCollector({ intent, transcribedText, onClose }: Form
     );
   };
 
-  // ─── All fields to show (filled first, then missing) ─────────────────────
 
   const allFilledFields = Object.entries(formData)
     .filter(([k, v]) => {
@@ -189,12 +181,11 @@ export default function FormCollector({ intent, transcribedText, onClose }: Form
       return !missingFields.includes(k);
     });
 
-  // ─── JSX ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="form-collector-overlay">
       <div className="form-collector-panel">
-        {/* Header */}
+        {}
         <div className="form-header">
           <div>
             <span className="form-badge">{intent}</span>
@@ -211,7 +202,7 @@ export default function FormCollector({ intent, transcribedText, onClose }: Form
           )}
         </div>
 
-        {/* Loading state */}
+        {}
         {step === "loading" && (
           <div className="form-loading">
             <div className="form-spinner" />
@@ -219,17 +210,17 @@ export default function FormCollector({ intent, transcribedText, onClose }: Form
           </div>
         )}
 
-        {/* Error */}
+        {}
         {error && (
           <div className="form-error">
             <strong>Error:</strong> {error}
           </div>
         )}
 
-        {/* Form fields */}
+        {}
         {(step === "filling" || step === "generating") && (
           <div className="form-fields-container">
-            {/* Missing fields section */}
+            {}
             {missingFields.length > 0 && (
               <div className="fields-section">
                 <h3 className="section-title missing-section-title">
@@ -241,7 +232,7 @@ export default function FormCollector({ intent, transcribedText, onClose }: Form
               </div>
             )}
 
-            {/* Pre-filled fields section */}
+            {}
             {allFilledFields.length > 0 && (
               <div className="fields-section">
                 <h3 className="section-title filled-section-title">
@@ -255,7 +246,7 @@ export default function FormCollector({ intent, transcribedText, onClose }: Form
           </div>
         )}
 
-        {/* Generate button */}
+        {}
         {(step === "filling" || step === "generating") && (
           <div className="form-actions">
             <button
@@ -278,7 +269,7 @@ export default function FormCollector({ intent, transcribedText, onClose }: Form
           </div>
         )}
 
-        {/* Done — PDF ready */}
+        {}
         {step === "done" && pdfUrl && (
           <div className="form-done">
             <div className="done-icon">📄</div>
