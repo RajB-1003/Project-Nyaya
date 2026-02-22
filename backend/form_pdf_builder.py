@@ -1,5 +1,5 @@
 
-﻿"""
+"""
 form_pdf_builder.py -- Project Nyaya
 Generates formatted government legal document drafts as PDFs.
 Uses ONLY Latin-1 safe characters (Helvetica core font compatibility).
